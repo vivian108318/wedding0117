@@ -69,7 +69,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // 您的 Firebase Config
         const firebaseConfig = {
@@ -145,7 +145,8 @@
             const docRef = doc(db, "wedding_attendance", "global_status");
         
             // ✅ 先確保文件存在（避免某些情況下讀得到但資料結構空）
-            await setDoc(docRef, { keys: [] }, { merge: true });
+            const initSnap = await getDoc(docRef);
+               if (!initSnap.exists()) {await setDoc(docRef, { keys: [] }, { merge: true });}
         
             onSnapshot(
               docRef,
