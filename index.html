@@ -10,7 +10,9 @@
     <style>
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #FDFBF9; color: #5D4D4A; }
         .font-serif { font-family: 'Cinzel', serif; }
+        /* 沒滿桌：深紅色 */
         .table-active { background-color: #8E2424; color: white; transform: scale(1.05); box-shadow: 0 10px 15px -3px rgba(142, 36, 36, 0.2); }
+        /* 坐滿桌：淡化處理 */
         .table-full { background-color: #F5E8E2; color: #D1B8B0; border: 1px dashed #D1B8B0; opacity: 0.5; transform: scale(0.92); }
         .aisle-bg { background-color: rgba(142, 36, 36, 0.03); }
         .modal-up { animation: slideUp 0.3s ease-out; }
@@ -20,37 +22,41 @@
 <body class="flex justify-center bg-stone-50">
     <div id="app" class="w-full max-w-md bg-white min-h-screen flex flex-col relative shadow-2xl">
         
-        <!-- Loading 遮罩 -->
-        <div id="sync-loader" class="fixed inset-0 bg-white/95 z-[100] flex items-center justify-center flex-col backdrop-blur-sm transition-opacity duration-500">
-            <div class="w-10 h-10 border-4 border-stone-100 border-t-[#8E2424] rounded-full animate-spin mb-4"></div>
-            <p id="loader-text" class="text-[10px] font-bold tracking-[0.3em] text-stone-400 uppercase">Connecting to Cloud...</p>
-            <button id="retry-btn" onclick="location.reload()" class="hidden mt-6 px-6 py-2 bg-stone-100 text-stone-500 text-xs rounded-full font-bold">手動重試</button>
+        <!-- 狀態欄：顯示連線狀況 -->
+        <div class="bg-stone-800 text-[10px] text-white px-4 py-1 flex justify-between items-center font-bold tracking-widest">
+            <div class="flex items-center gap-2">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                <span id="status-text">雲端連線中...</span>
+            </div>
+            <span id="user-id">OFFLINE</span>
         </div>
 
         <!-- Header -->
-        <header class="px-6 pt-10 pb-6 text-center border-b border-rose-50 bg-white">
+        <header class="px-6 pt-8 pb-6 text-center border-b border-rose-50 bg-white">
             <h1 class="text-2xl font-serif tracking-[0.1em] uppercase mb-1 text-[#8E2424]">Wedding Usher</h1>
-            <p class="text-[10px] text-stone-300 font-bold uppercase tracking-[0.8em] mb-4">楊府邱府聯姻 · 實時同步助手</p>
+            <p class="text-[10px] text-stone-300 font-bold uppercase tracking-[0.8em] mb-4">楊府邱府聯姻 · 雲端即時同步</p>
             <div class="bg-white border border-rose-100 rounded-2xl px-6 py-3 inline-block shadow-sm">
-                <span class="text-[12px] text-rose-300 font-black uppercase mb-1 block">即時累計報到人數</span>
+                <span class="text-[10px] text-rose-300 font-black uppercase mb-1 block">即時報到統計</span>
                 <span class="text-2xl font-serif font-black text-[#8E2424]" id="total-count">0</span>
                 <span class="text-stone-300 text-xs font-bold">/ 250</span>
             </div>
             <div class="mt-6 relative px-2">
                 <i data-lucide="search" class="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-200"></i>
-                <input type="text" id="search" placeholder="搜尋姓名、桌號..." class="w-full bg-stone-50 border-stone-100 border rounded-2xl py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-rose-200">
+                <input type="text" id="search" placeholder="搜尋姓名、桌號..." class="w-full bg-stone-50 border-stone-100 border rounded-2xl py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-rose-100">
             </div>
         </header>
 
-        <!-- Tabs -->
+        <!-- Nav Tabs -->
         <nav class="flex border-b border-rose-50 sticky top-0 bg-white/95 backdrop-blur-md z-20">
             <button onclick="tab('map')" id="t-map" class="flex-1 py-4 text-[11px] font-bold uppercase tracking-widest border-b-2 border-[#8E2424] text-[#8E2424]">地圖定位</button>
             <button onclick="tab('list')" id="t-list" class="flex-1 py-4 text-[11px] font-bold uppercase tracking-widest text-stone-300">桌次列表</button>
             <button onclick="tab('all')" id="t-all" class="flex-1 py-4 text-[11px] font-bold uppercase tracking-widest text-stone-300">賓客清單</button>
         </nav>
 
+        <!-- Main View -->
         <main id="main-view" class="flex-1 overflow-auto p-4 bg-[#FDFBF9]"></main>
 
+        <!-- Modal -->
         <div id="modal" class="fixed inset-0 z-[60] hidden flex items-end justify-center px-4 pb-12">
             <div class="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onclick="closeModal()"></div>
             <div class="bg-white w-full max-w-lg rounded-[3.5rem] shadow-2xl relative z-10 max-h-[85vh] flex flex-col border border-rose-50 modal-up">
@@ -65,6 +71,7 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+        // 您的 Firebase Config
         const firebaseConfig = {
           apiKey: "AIzaSyCfbOv5cMQ4VKcjQenDZG5KofSlT_Cn5Xg",
           authDomain: "wedding-63f82.firebaseapp.com",
@@ -79,8 +86,9 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // 數據結構
         const DATA = {
-            '主桌': ['楊智傑', '邱馨慧', '楊朝宗', '吳孟雀', '楊廖烏糖', '吳新竹', '魏文生', '邱木水', '陳永福', '陳黃素雲', '吳孟珠', '邱求'],
+            '主桌': ['楊智傑', '邱馨慧', '楊朝宗', '吳孟雀', '楊廖烏糖', '吳新竹', '魏文生', '邱求', '陳永福', '陳黃素雲', '吳孟珠', '邱木水'],
             '1': [], '2': ['廖碧娥', '廖碧娥', '廖碧娥', '詹銀', '詹銀', '何銘炤', '何銘炤', '詹素梅', '詹素梅'],
             '3': ['楊寶珠', '楊寶珠', '楊寶珠', '楊寶珠', '陳金買', '陳金買', '林鳳淳', '林鳳淳'],
             '4': ['謝採緹', '謝承儒', '謝承儒', '潘素', '潘素', '曾定輝', '曾定輝', '陳錫宏', '陳錫宏', '林佳銘', '林佳銘'],
@@ -115,71 +123,70 @@
             { id: '10', r: 7, c: 3 }, { id: 'A', r: 7, c: 5 }, { id: '20', r: 7, c: 7 }, { id: '24', r: 7, c: 8 },
         ];
 
-        let checkedKeys = new Set();
+        let stateKeys = new Set();
         let currentTab = 'map';
-        let openTableId = null;
+        let activeTableId = null;
 
-        async function init() {
+        // 初始化：連線與監聽
+        async function start() {
             try {
-                const userCred = await signInAnonymously(auth);
-                console.log("Logged in as:", userCred.user.uid);
-
-                // 使用極簡路徑，對應 Rules
-                const docRef = doc(db, "wedding", "status");
+                const cred = await signInAnonymously(auth);
+                document.getElementById('user-id').innerText = "ID: " + cred.user.uid.substring(0, 6);
+                
+                // 固定使用簡單路徑
+                const docRef = doc(db, "wedding_attendance", "global_status");
                 
                 onSnapshot(docRef, (snap) => {
                     if (snap.exists()) {
-                        checkedKeys = new Set(snap.data().list || []);
+                        stateKeys = new Set(snap.data().keys || []);
                     }
+                    // 更新連線燈
+                    document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-green-500";
+                    document.getElementById('status-text').innerText = "雲端同步中 (ONLINE)";
+                    
                     render();
-                    if (openTableId) updateModal(openTableId);
-                    document.getElementById('sync-loader').style.opacity = '0';
-                    setTimeout(() => document.getElementById('sync-loader').style.display = 'none', 500);
+                    if (activeTableId) updateModal(activeTableId);
                 }, (err) => {
-                    console.error("Firestore Error:", err);
-                    showError();
+                    console.error("Snapshot error:", err);
+                    document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-red-500";
+                    document.getElementById('status-text').innerText = "同步失敗 (ERROR)";
                 });
             } catch (err) {
-                console.error("Auth Error:", err);
-                showError();
+                console.error("Start Error:", err);
             }
         }
 
-        function showError() {
-            document.getElementById('loader-text').innerText = "連線失敗，請檢查規則與登入設定";
-            document.getElementById('retry-btn').classList.remove('hidden');
-        }
-
+        // 寫入雲端
         window.toggleCloud = async (tid, name) => {
             const key = `${tid}-${name}`;
-            const nextKeys = new Set(checkedKeys);
-            if (nextKeys.has(key)) nextKeys.delete(key);
-            else nextKeys.add(key);
+            const newKeys = new Set(stateKeys);
+            if (newKeys.has(key)) newKeys.delete(key);
+            else newKeys.add(key);
             
             try {
-                const docRef = doc(db, "wedding", "status");
-                await setDoc(docRef, { list: Array.from(nextKeys) });
+                const docRef = doc(db, "wedding_attendance", "global_status");
+                await setDoc(docRef, { keys: Array.from(newKeys) });
             } catch (err) {
-                console.error("Write Error:", err);
-                alert("寫入失敗！請確認 Firebase Rules 是否已發佈");
+                console.error("Write fail:", err);
+                alert("無法寫入資料庫，請檢查 Rules 設定！");
             }
         };
 
         function render() {
-            const container = document.getElementById('main-view');
+            const main = document.getElementById('main-view');
             const term = document.getElementById('search').value.toLowerCase();
             
             let total = 0;
             Object.entries(DATA).forEach(([tid, list]) => {
                 const unique = aggregate(list);
-                unique.forEach(u => { if(checkedKeys.has(`${tid}-${u.name}`)) total += u.count; });
+                unique.forEach(u => { if(stateKeys.has(`${tid}-${u.name}`)) total += u.count; });
             });
             document.getElementById('total-count').innerText = total;
 
-            if (term) { renderSearch(container, term); return; }
-            if (currentTab === 'map') renderMap(container);
-            else if (currentTab === 'list') renderList(container);
-            else renderAll(container);
+            if (term) { renderSearch(main, term); return; }
+            if (currentTab === 'map') renderMap(main);
+            else if (currentTab === 'list') renderList(main);
+            else renderAll(main);
             lucide.createIcons();
         }
 
@@ -195,7 +202,7 @@
             for (let i = 0; i < 63; i++) {
                 const r = Math.floor(i / 9) + 1, c = (i % 9) + 1;
                 const cell = GRID.find(g => g.r === r && g.c === c);
-                if (cell?.id === 'A') html += `<div class="aisle-bg flex items-center justify-center rounded-lg opacity-30"><span class="rotate-90 text-[5px] text-stone-300 font-bold">Aisle</span></div>`;
+                if (cell?.id === 'A') html += `<div class="aisle-bg flex items-center justify-center opacity-30"><span class="rotate-90 text-[5px] font-bold">Aisle</span></div>`;
                 else if (cell) {
                     const full = isFull(cell.id);
                     html += `<button onclick="openT('${cell.id}')" class="w-10 h-10 rounded-full flex items-center justify-center font-serif text-[10px] font-bold transition-all ${full ? 'table-full' : 'table-active'}">${cell.id === '主桌' ? '主' : cell.id}</button>`;
@@ -208,7 +215,7 @@
             let html = `<div class="space-y-3">`;
             Object.keys(DATA).sort((a,b) => (a==='主桌'?-1:b==='主桌'?1:parseInt(a)-parseInt(b))).forEach(tid => {
                 const full = isFull(tid);
-                html += `<div onclick="openT('${tid}')" class="bg-white p-5 rounded-[2.5rem] border flex items-center justify-between shadow-sm transition-all ${full ? 'opacity-40' : 'border-rose-100 ring-1 ring-rose-50'}"><div class="flex items-center gap-6"><div class="w-14 h-14 rounded-2xl flex items-center justify-center font-serif text-xl ${full ? 'bg-stone-50 text-stone-200' : 'bg-[#8E2424] text-white'}">${tid==='主桌'?'M':tid}</div><div><h3 class="font-bold text-stone-700">Table ${tid}</h3><div class="flex gap-2 mt-1"><span class="text-[9px] text-stone-300 font-bold uppercase">${aggregate(DATA[tid]).length} 代表人</span>${full ? '<span class="text-[9px] text-[#8E2424] font-black uppercase flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> FULL</span>' : ''}</div></div></div><i data-lucide="chevron-right" class="w-5 h-5 text-stone-200"></i></div>`;
+                html += `<div onclick="openT('${tid}')" class="bg-white p-5 rounded-[2.5rem] border flex items-center justify-between shadow-sm transition-all ${full ? 'opacity-40' : 'border-rose-100 ring-1 ring-rose-50'}"><div class="flex items-center gap-6"><div class="w-14 h-14 rounded-2xl flex items-center justify-center font-serif text-xl ${full ? 'bg-stone-50 text-stone-200' : 'bg-[#8E2424] text-white'}">${tid==='主桌'?'M':tid}</div><div><h3 class="font-bold text-stone-700">Table ${tid}</h3><div class="flex gap-2 mt-1"><span class="text-[9px] text-stone-300 font-bold uppercase tracking-widest">${aggregate(DATA[tid]).length} 代表人</span>${full ? '<span class="text-[9px] text-[#8E2424] font-black uppercase flex items-center gap-1 tracking-widest"><i data-lucide="check" class="w-3 h-3"></i> FULL</span>' : ''}</div></div></div><i data-lucide="chevron-right" class="w-5 h-5 text-stone-200"></i></div>`;
             });
             container.innerHTML = html + `</div>`;
         }
@@ -218,7 +225,7 @@
             const all = [];
             Object.entries(DATA).forEach(([tid, list]) => aggregate(list).forEach(r => all.push({...r, tid})));
             all.sort((a,b) => (a.tid==='主桌'?-1:b.tid==='主桌'?1:parseInt(a.tid)-parseInt(b.tid))).forEach(r => {
-                const ok = checkedKeys.has(`${r.tid}-${r.name}`);
+                const ok = stateKeys.has(`${r.tid}-${r.name}`);
                 html += `<div onclick="openT('${r.tid}')" class="flex items-center justify-between px-8 py-5 border-b border-stone-50 active:bg-rose-50/20"><div class="flex items-center gap-5"><div class="w-10 h-10 rounded-full flex items-center justify-center ${ok?'text-stone-200':'bg-white text-rose-300 shadow-sm border border-rose-50'}">${ok?'<i data-lucide="check"></i>':'<i data-lucide="user"></i>'}</div><span class="text-lg font-bold ${ok?'text-stone-300 line-through':'text-stone-700'}">${r.name} ${r.count>1?`<span class="text-xs text-rose-300"> +${r.count-1}位</span>`:''}</span></div><span class="text-[9px] bg-rose-50 text-[#8E2424] px-3 py-1.5 rounded-full font-black">T-${r.tid==='主桌'?'M':r.tid}</span></div>`;
             });
             container.innerHTML = html + `</div>`;
@@ -233,7 +240,7 @@
         }
 
         window.openT = (tid) => {
-            openTableId = tid;
+            activeTableId = tid;
             updateModal(tid);
             document.getElementById('modal').style.display = 'flex';
         };
@@ -243,18 +250,19 @@
             const unique = aggregate(list);
             let html = `<div class="flex items-center gap-6 mb-8"><div class="w-16 h-16 rounded-[2rem] flex items-center justify-center text-white font-serif text-3xl shadow-xl bg-[#8E2424]">${tid === '主桌' ? 'M' : tid}</div><div><h2 class="text-2xl font-serif text-stone-800 tracking-wider">Table ${tid}</h2><span class="text-[10px] font-bold text-stone-300 uppercase tracking-widest">共 ${list.length} 人</span></div></div><div class="space-y-4">`;
             unique.forEach(u => {
-                const ok = checkedKeys.has(`${tid}-${u.name}`);
-                html += `<div onclick="toggleCloud('${tid}', '${u.name}')" class="flex items-center justify-between p-6 rounded-[2.5rem] border transition-all ${ok?'opacity-40 bg-stone-50/50':'bg-white border-rose-50 shadow-sm'}"><div class="flex items-center gap-5"><div class="w-10 h-10 rounded-full flex items-center justify-center ${ok?'text-stone-200':'bg-rose-50 text-rose-800'}"><i data-lucide="user"></i></div><div><div class="text-xl font-bold ${ok?'text-stone-300 line-through':'text-stone-700'}">${u.name}</div>${u.count>1?`<div class="text-[10px] text-rose-400 font-bold mt-1 uppercase tracking-widest">含親友共 ${u.count} 位</div>`:''}</div></div><div class="w-8 h-8 rounded-full border-2 flex items-center justify-center ${ok?'bg-stone-100 border-stone-100':'border-rose-100'}">${ok?'<i data-lucide="check" class="w-4 h-4 text-stone-300"></i>':''}</div></div>`;
+                const ok = stateKeys.has(`${tid}-${u.name}`);
+                html += `<div onclick="toggleCloud('${tid}', '${u.name}')" class="flex items-center justify-between p-6 rounded-[2.5rem] border transition-all ${ok?'opacity-40 bg-stone-50/50':'bg-white border-rose-50 shadow-sm'}"><div class="flex items-center gap-5"><div class="w-10 h-10 rounded-full flex items-center justify-center ${ok?'text-stone-200':'bg-rose-50 text-rose-800'}"><i data-lucide="user"></i></div><div><div class="text-xl font-bold ${ok?'text-stone-300 line-through':'text-stone-700'}">${u.name}</div>${u.count>1?`<div class="text-[10px] text-rose-400 font-bold mt-1">含親友共 ${u.count} 位</div>`:''}</div></div><div class="w-8 h-8 rounded-full border-2 flex items-center justify-center ${ok?'bg-stone-100 border-stone-100':'border-rose-100'}">${ok?'<i data-lucide="check" class="w-4 h-4 text-stone-300"></i>':''}</div></div>`;
             });
             document.getElementById('modal-content').innerHTML = html + `</div>`;
             lucide.createIcons();
         }
 
-        window.closeModal = () => { document.getElementById('modal').style.display = 'none'; openTableId = null; };
+        window.closeModal = () => { document.getElementById('modal').style.display = 'none'; activeTableId = null; };
         function aggregate(list) { const c = {}; list.forEach(n => c[n]=(c[n]||0)+1); return Object.entries(c).map(([name,count])=>({name,count})); }
-        function isFull(tid) { const list=DATA[tid]; if(!list || list.length===0) return false; return [...new Set(list)].every(n => checkedKeys.has(`${tid}-${n}`)); }
+        function isFull(tid) { const list=DATA[tid]; if(!list || list.length===0) return false; return [...new Set(list)].every(n => stateKeys.has(`${tid}-${n}`)); }
         document.getElementById('search').addEventListener('input', render);
-        init();
+        start();
     </script>
 </body>
 </html>
+
