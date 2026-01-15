@@ -126,34 +126,47 @@
         let stateKeys = new Set();
         let currentTab = 'map';
         let activeTableId = null;
-
+        function setStatus(ok, msg) {
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className = ok
+    ? "w-2 h-2 rounded-full bg-green-500"
+    : "w-2 h-2 rounded-full bg-red-500 animate-pulse";
+  text.innerText = msg;
+}
+        
         // 初始化：連線與監聽
         async function start() {
-            try {
-                const cred = await signInAnonymously(auth);
-                document.getElementById('user-id').innerText = "ID: " + cred.user.uid.substring(0, 6);
-                
-                // 固定使用簡單路徑
-                const docRef = doc(db, "wedding_attendance", "global_status");
-                
-                onSnapshot(docRef, (snap) => {
-                    if (snap.exists()) {
-                        stateKeys = new Set(snap.data().keys || []);
-                    }
-                    // 更新連線燈
-                    document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-green-500";
-                    document.getElementById('status-text').innerText = "雲端同步中 (ONLINE)";
-                    
-                    render();
-                    if (activeTableId) updateModal(activeTableId);
-                }, (err) => {
-                    console.error("Snapshot error:", err);
-                    document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-red-500";
-                    document.getElementById('status-text').innerText = "同步失敗 (ERROR)";
-                });
-            } catch (err) {
-                console.error("Start Error:", err);
-            }
+          try {
+            const cred = await signInAnonymously(auth);
+            document.getElementById('user-id').innerText =
+              "ID: " + cred.user.uid.substring(0, 6);
+        
+            const docRef = doc(db, "wedding_attendance", "global_status");
+        
+            // ✅ 先確保文件存在（避免某些情況下讀得到但資料結構空）
+            await setDoc(docRef, { keys: [] }, { merge: true });
+        
+            onSnapshot(
+              docRef,
+              (snap) => {
+                const data = snap.data() || {};
+                stateKeys = new Set(Array.isArray(data.keys) ? data.keys : []);
+        
+                setStatus(true, "雲端同步中 (ONLINE)");
+        
+                render();
+                if (activeTableId) updateModal(activeTableId);
+              },
+              (err) => {
+                console.error("Snapshot error:", err);
+                setStatus(false, `同步失敗: ${err.code || ""} ${err.message || err}`);
+              }
+            );
+          } catch (err) {
+            console.error("Start Error:", err);
+            setStatus(false, `登入/初始化失敗: ${err.code || ""} ${err.message || err}`);
+          }
         }
 
         // 寫入雲端
